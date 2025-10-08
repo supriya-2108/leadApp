@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
-import { Card } from "@/components/ui/card"
-import { LoginForm } from "@/components/login-form"
+import { Card } from "@/src/components/ui/card"
+import { LoginForm } from "@/src/components/authForm"
 
 export const metadata: Metadata = {
   title: "Log in",
@@ -15,7 +15,7 @@ export default function LoginPage() {
           Log in
         </h1>
         <Card className="bg-card text-card-foreground shadow-sm">
-          <LoginForm />
+          <LoginForm mode="login"/>
         </Card>
       </section>
     </main>
