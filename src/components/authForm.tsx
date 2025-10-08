@@ -13,23 +13,28 @@ import {
   CardFooter,
 } from "@/src/components/ui/card";
 import { toast } from "sonner"; // Import directly from sonner
+import axios from "axios";
+import { useAuthStore } from "../store/authStore";
+import { useRouter } from "next/navigation";
 type Props={
     mode:string
 }
 export function LoginForm({mode}:Props) {
+  const router=useRouter()
   const [showPassword, setShowPassword] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [errors, setErrors] = React.useState<{
     email?: string;
     password?: string;
     name?: string;
-  }>({}); // Include name in errors
-
+  }>({}); 
+  const [error,setError]=React.useState('')
+  const login = useAuthStore((state) => state.login);
   function validate(form: FormData) {
     const nextErrors: typeof errors = {};
     const email = String(form.get("email") || "").trim();
     const password = String(form.get("password") || "");
-    const name = mode === "register" ? String(form.get("name") || "").trim() : "";
+    const name = mode === "signup" ? String(form.get("name") || "").trim() : "";
 
     if (!email) nextErrors.email = "Email is required";
     else if (!/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Enter a valid email";
@@ -37,7 +42,7 @@ export function LoginForm({mode}:Props) {
     if (!password) nextErrors.password = "Password is required";
     else if (password.length < 8) nextErrors.password = "Must be at least 8 characters";
 
-    if (mode === "register") {
+    if (mode === "signup") {
       if (!name) nextErrors.name = "Name is required";
       else if (name.length < 2) nextErrors.name = "Name must be at least 2 characters";
     }
@@ -46,6 +51,7 @@ export function LoginForm({mode}:Props) {
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    setError('')
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const { nextErrors, email, password, name } = validate(form);
@@ -55,29 +61,34 @@ export function LoginForm({mode}:Props) {
 
     try {
       setSubmitting(true);
-      console.log("[v0] ", mode === "login" ? "Logging in" : "Registering", "with:", {
-        email,
-        passwordLength: password.length,
+      const response = await axios.post(`/api/auth/${mode}`, {
         name,
+        email,
+        password,
+      }, {
+        headers: { "Content-Type": "application/json" },
       });
-      await new Promise((r) => setTimeout(r, 600));
-
-      toast(
-        mode === "login" ? "Logged in" : "Registered",
-        {
-          description: mode === "login" ? "Welcome back!" : "Account created successfully!",
-          duration: 3000,
-        }
-      );
+      const data = response.data;
+      console.log(response)
+      if (response.status === 200) {
+        localStorage.setItem("token", data.token); // Store token
+        login(data.token, data.user); // Update auth store
+        toast("Success", { description: "Redirecting..." });
+        // Redirect to dashboard (e.g., router.push("/dashboard"))
+      } else {
+        throw new Error(data.error || "Unexpected response");
+      }
     } catch (err: any) {
-      toast(
-        mode === "login" ? "Login failed" : "Registration failed",
-        {
-          description: err?.message ?? "Something went wrong.",
-          duration: 3000,
-          style: { background: "#ef4444", color: "white" }, // Custom styling for error
-        }
-      );
+      console.log(err);
+      if(err.status==400||err.status==401){
+        setError(err.response.data.error)
+      }
+      const errorMessage = err.response?.data?.error || err.message || "Server error";
+      toast("Error", {
+        description: errorMessage,
+        duration: 3000,
+        style: { background: "#ef4444", color: "white" },
+      });
     } finally {
       setSubmitting(false);
     }
@@ -87,7 +98,7 @@ export function LoginForm({mode}:Props) {
     <>
       <CardHeader>
         <CardTitle className="text-2xl">
-          {mode === "login" ? "Log in" : "Register"}
+          {mode === "login" ? "Log in" : "Sign Up"}
         </CardTitle>
         <CardDescription className="text-muted-foreground">
           {mode === "login"
@@ -98,8 +109,8 @@ export function LoginForm({mode}:Props) {
 
       <form onSubmit={onSubmit} noValidate>
         <CardContent className="flex flex-col gap-4">
-          {/* Name (only for register) */}
-          {mode === "register" && (
+          {/* Name (only for signup) */}
+          {mode === "signup" && (
             <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -166,8 +177,9 @@ export function LoginForm({mode}:Props) {
               </p>
             ) : null}
           </div>
+          
         </CardContent>
-
+<p className="text-sm text-red-800 flex text-center justify-center w-full mt-2">{error}</p>
         <CardFooter className="flex flex-col gap-3 mt-4">
           <Button
             type="submit"
@@ -177,10 +189,10 @@ export function LoginForm({mode}:Props) {
             {submitting
               ? mode === "login"
                 ? "Signing in..."
-                : "Registering..."
+                : "signuping..."
               : mode === "login"
               ? "Sign in"
-              : "Register"}
+              : "signup"}
           </Button>
           <p className="text-sm text-center text-muted-foreground">
             {mode === "login"
@@ -188,7 +200,9 @@ export function LoginForm({mode}:Props) {
               : "Already have an account? "}
             <button
               type="button"
-             
+              onClick={() => {
+                router.push(mode === "login" ? "/signup" : "/login");
+              }}
               className="hover:underline underline-offset-4 text-foreground"
             >
               {mode === "login" ? "Sign up" : "Log in"}

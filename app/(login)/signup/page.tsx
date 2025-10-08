@@ -15,7 +15,7 @@ export default function RegisterPage() {
           Log in
         </h1>
         <Card className="bg-card text-card-foreground shadow-sm">
-          <LoginForm mode="register"/>
+          <LoginForm mode="signup"/>
         </Card>
       </section>
     </main>
